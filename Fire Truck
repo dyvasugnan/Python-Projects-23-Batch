@@ -1,0 +1,213 @@
+import tkinter as tk
+from tkinter import messagebox, scrolledtext
+import winsound
+
+def compute_routes(start, end, grid_size, obstacles):
+    def get_neighbors(corner, directions):
+        x, y = (corner - 1) // grid_size + 1, (corner - 1) % grid_size + 1
+        neighbors = []
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 1 <= nx <= grid_size and 1 <= ny <= grid_size:
+                neighbor = (nx - 1) * grid_size + ny
+                if neighbor not in obstacles:
+                    neighbors.append(neighbor)
+        return neighbors
+
+    all_directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)]
+
+    all_routes = []
+    queue = [(start, [start])]
+    visited = set()
+
+    while queue:
+        current, path = queue.pop(0)
+        if current == end:
+            all_routes.append(path)
+        elif current not in visited:
+            visited.add(current)
+            for neighbor in get_neighbors(current, all_directions):
+                if neighbor not in path:
+                    queue.append((neighbor, path + [neighbor]))
+
+    shortest_route = min(all_routes, key=len) if all_routes else []
+    return all_routes, shortest_route
+
+class FireRouteFinderGUI:
+    def __init__(self, root):
+        self.root = root
+        root.title("Fire Route Finder")
+
+        self.input_frame = tk.Frame(root, padx=10, pady=10)
+        self.input_frame.grid(row=0, column=0, pady=20)
+
+        self.fire_corner_label = tk.Label(self.input_frame, text="Enter Fire Location (x y):")
+        self.fire_corner_label.grid(row=0, column=0, padx=5, pady=5)
+        self.fire_corner_entry = tk.Entry(self.input_frame)
+        self.fire_corner_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        self.obstacle_label = tk.Label(self.input_frame, text="Enter Obstacles (x y):")
+        self.obstacle_label.grid(row=1, column=0, padx=5, pady=5)
+        self.obstacle_entry = tk.Entry(self.input_frame)
+        self.obstacle_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        self.add_obstacle_button = tk.Button(self.input_frame, text="Add Obstacle", command=self.add_obstacle)
+        self.add_obstacle_button.grid(row=1, column=2, padx=5, pady=5)
+
+        self.find_button = tk.Button(self.input_frame, text="Find Routes", command=self.calculate_routes)
+        self.find_button.grid(row=0, column=2, padx=5, pady=5)
+
+        self.canvas = tk.Canvas(root, width=800, height=800, bg="white")
+        self.canvas.grid(row=1, column=0, pady=20)
+
+        self.routes_display = scrolledtext.ScrolledText(root, width=40, height=50)
+        self.routes_display.grid(row=1, column=1, padx=10, pady=20)
+
+        self.grid_size = 20
+        self.fire_corner = None
+        self.obstacles = set()
+        self.fire_truck_position = (20, 20)
+        self.draw_grid(self.grid_size)
+        self.route_colors = ["red", "blue", "green", "purple", "orange", "yellow", "cyan", "magenta"]
+
+    def draw_grid(self, size):
+        self.canvas.delete("all")
+
+        color1 = "#D3D3D3"
+        color2 = "#A9A9A9"
+
+        for i in range(1, size + 1):
+            for j in range(1, size + 1):
+                x1, y1 = (i - 1) * 40, (j - 1) * 40
+                x2, y2 = x1 + 40, y1 + 40
+                fill_color = color1 if (i + j) % 2 == 0 else color2
+                self.canvas.create_rectangle(x1, y1, x2, y2, fill=fill_color, outline="black")
+
+        for i in range(1, size + 1):
+            self.canvas.create_text((i - 1) * 40 + 20, 10, text=str(i))
+            self.canvas.create_text(10, (i - 1) * 40 + 20, text=str(i))
+
+        self.canvas.create_text(20, 20, anchor=tk.CENTER, text="🏠", font=("Arial", 24), fill="blue")
+        self.fire_truck_id = self.canvas.create_text(20, 20, anchor=tk.CENTER, text="🚒", font=("Arial", 24), fill="red")
+
+        for obstacle in self.obstacles:
+            x = (obstacle - 1) // self.grid_size + 1
+            y = (obstacle - 1) % self.grid_size + 1
+            self.canvas.create_text((x - 1) * 40 + 20, (y - 1) * 40 + 20, anchor=tk.CENTER, text="⚠️", font=("Arial", 20), fill="yellow")
+
+    def add_obstacle(self):
+        obstacle_coords = self.obstacle_entry.get().split()
+        if len(obstacle_coords) != 2:
+            self.show_error("Invalid input", "Please enter two coordinates separated by a space.")
+            return
+
+        try:
+            x, y = map(int, obstacle_coords)
+        except ValueError:
+            self.show_error("Invalid input", "Coordinates must be integers.")
+            return
+
+        if not (1 <= x <= self.grid_size and 1 <= y <= self.grid_size):
+            self.show_error("Invalid input", f"Coordinates must be in the range [1, {self.grid_size}].")
+            return
+
+        obstacle_corner = (x - 1) * self.grid_size + y
+        self.obstacles.add(obstacle_corner)
+        self.draw_grid(self.grid_size)
+
+    def calculate_routes(self):
+        fire_corner_coords = self.fire_corner_entry.get().split()
+        if len(fire_corner_coords) != 2:
+            self.show_error("Invalid input", "Please enter two coordinates separated by a space.")
+            return
+
+        try:
+            x, y = map(int, fire_corner_coords)
+        except ValueError:
+            self.show_error("Invalid input", "Coordinates must be integers.")
+            return
+
+        new_grid_size = max(x, y)
+        if not (1 <= x <= new_grid_size and 1 <= y <= new_grid_size):
+            self.show_error("Invalid input", f"Coordinates must be in the range [1, {new_grid_size}].")
+            return
+
+        self.grid_size = new_grid_size
+        self.draw_grid(self.grid_size)
+
+        self.fire_corner = (x - 1) * self.grid_size + y
+
+        all_routes, shortest_route = compute_routes(1, self.fire_corner, self.grid_size, self.obstacles)
+        self.routes_display.delete(1.0, tk.END)
+        if not all_routes:
+            self.routes_display.insert(tk.END, "No routes found.\n")
+        else:
+            self.routes_display.insert(tk.END, f"There are {len(all_routes)} routes from the fire station to the fire location ({x}, {y}).\n")
+            for i, route in enumerate(all_routes):
+                route_coords = [(1, 1)] + [((pos - 1) // self.grid_size + 1, (pos - 1) % self.grid_size + 1) for pos in route[1:]]
+                self.routes_display.insert(tk.END, f"Route {i + 1}: {route_coords}\n")
+            shortest_route_coords = [(1, 1)] + [((pos - 1) // self.grid_size + 1, (pos - 1) % self.grid_size + 1) for pos in shortest_route[1:]]
+            self.routes_display.insert(tk.END, f"\nShortest Route: {shortest_route_coords}\n")
+            self.routes = all_routes
+            self.shortest_route = shortest_route
+            self.current_route_index = 0
+            self.current_route_step = 0
+            self.fire_truck_position = (20, 20)
+            self.move_fire_truck()
+
+        self.display_fire_corner(x, y)
+
+    def display_fire_corner(self, x, y):
+        self.canvas.create_text((x - 1) * 40 + 20, (y - 1) * 40 + 20, anchor=tk.CENTER, text="🔥", font=("Arial", 24), fill="orange")
+
+    def move_fire_truck(self):
+        if self.current_route_index < len(self.routes):
+            route = self.routes[self.current_route_index]
+            color = self.route_colors[self.current_route_index % len(self.route_colors)]
+            if self.current_route_step < len(route):
+                corner = route[self.current_route_step]
+                x = (corner - 1) // self.grid_size + 1
+                y = (corner - 1) % self.grid_size + 1
+                canvas_x = (x - 1) * 40 + 20
+                canvas_y = (y - 1) * 40 + 20
+                if self.current_route_step > 0:
+                    prev_corner = route[self.current_route_step - 1]
+                    prev_x = (prev_corner - 1) // self.grid_size + 1
+                    prev_y = (prev_corner - 1) % self.grid_size + 1
+                    prev_canvas_x = (prev_x - 1) * 40 + 20
+                    prev_canvas_y = (prev_y - 1) * 40 + 20
+                    self.canvas.create_line(prev_canvas_x, prev_canvas_y, canvas_x, canvas_y, fill=color, width=3)
+                self.canvas.coords(self.fire_truck_id, canvas_x, canvas_y)
+                self.canvas.itemconfig(self.fire_truck_id, fill=color)
+                self.current_route_step += 1
+                self.root.after(500, self.move_fire_truck)
+                winsound.PlaySound("fire-truck-siren-29900.wav", winsound.SND_ASYNC | winsound.SND_FILENAME)
+            else:
+                self.current_route_index += 1
+                self.current_route_step = 0
+                self.root.after(500, self.move_fire_truck)
+        else:
+            messagebox.showinfo("Fire Route Finder", "All routes have been traversed.")
+
+    def show_error(self, title, message):
+        messagebox.showerror(title, message)
+
+def open_main_window():
+    main_window = tk.Toplevel(root)
+
+    app = FireRouteFinderGUI(main_window)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.title("Main Window")
+
+    bg_photo = tk.PhotoImage(file="C:/Users/user/Downloads/WhatsApp Image 2024-06-01 at 7.38.43 PM.png")
+
+    bg_label = tk.Label(root, image=bg_photo)
+    bg_label.image = bg_photo
+    bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+    enter_button = tk.Button(root, text="Enter", command=open_main_window, height=3, width=30, bg="#93C572")
+    enter_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+
+    root.mainloop()
