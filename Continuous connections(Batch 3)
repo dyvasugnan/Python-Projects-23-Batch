@@ -1,0 +1,405 @@
+import pygame
+import sys
+import networkx as nx
+import time
+
+# Initialize Pygame
+pygame.init()
+
+# Screen dimensions
+width = 800
+height = 600
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
+LIGHT_BLUE = (173, 216, 230)
+
+# Pygame font
+pygame.font.init()
+font = pygame.font.Font(None, 32)
+
+# Initialize Pygame mixer
+pygame.mixer.init()
+
+# Load the notification sound file
+notification_sound_first = pygame.mixer.Sound(r"C:\Users\admin\Downloads\s1.mp3")
+notification_sound_second = pygame.mixer.Sound(r"C:\users\admin\Downloads\s2.mp3")
+notification_sound_third = pygame.mixer.Sound(r"C:\users\admin\Downloads\s3.mp3")
+
+# Global variables
+current_window = 1
+state_name = ""
+message_sent = False
+timestamps = {}  # Dictionary to store timestamps for each node
+
+# Define the graph as a dictionary
+state_districts = {
+    "AP": {
+        'capital': 'Guntur',
+        'nodes': {
+            'Visakhapatnam': (100, 200),
+            'Vijayawada': (200, 100),
+            'Guntur': (300, 300),
+            'Kurnool': (500, 100),
+            'Nellore': (500, 400),
+            'Kadapa': (600, 300),
+            'Chittoor': (700, 400),
+            'Anantapur': (700, 100),
+            'East Godavari': (100, 400),
+            'West Godavari': (200, 500),
+            'Prakasham': (500, 200),
+            'Krishna': (300, 400),
+            'Srikakulam': (300, 200)
+        },
+        'edges': [
+            ('Visakhapatnam', 'East Godavari'),
+            ('Visakhapatnam', 'Vijayawada'),
+            ('Vijayawada', 'Srikakulam'),
+            ('Anantapur', 'Kurnool'),
+            ('Prakasham', 'Kurnool'),
+            ('Guntur', 'Krishna'),
+            ('Prakasham', 'Nellore'),
+            ('Nellore', 'Chittoor'),
+            ('Guntur', 'Prakasham'),
+            ('Chittoor', 'Anantapur'),
+            ('Chittoor', 'Kadapa'),
+            ('East Godavari', 'West Godavari'),
+            ('Prakasham', 'Kadapa'),
+            ('West Godavari', 'Krishna')
+        ]
+    },
+    "Karnataka": {
+        'capital': 'Bengaluru',
+        'nodes': {
+            'Bengaluru': (300, 300),
+            'Mysuru': (200, 400),
+            'Mangalore': (100, 500),
+            'Hubli': (500, 100),
+            'Belgaum': (600, 200),
+            'Shimoga': (400, 300),
+            'Bellary': (500, 400),
+            'Tumkur': (350, 250),
+            'Dharwad': (550, 150),
+            'Gulbarga': (700, 100),
+            'Bijapur': (650, 300)
+        },
+        'edges': [
+            ('Bengaluru', 'Mysuru'),
+            ('Bengaluru', 'Tumkur'),
+            ('Tumkur', 'Shimoga'),
+            ('Shimoga', 'Hubli'),
+            ('Hubli', 'Belgaum'),
+            ('Belgaum', 'Dharwad'),
+            ('Dharwad', 'Bellary'),
+            ('Bellary', 'Bijapur'),
+            ('Bijapur', 'Gulbarga'),
+            ('Mysuru', 'Mangalore')
+        ]
+    },
+    "Telangana": {
+        'capital': 'Hyderabad',
+        'nodes': {
+            'Hyderabad': (300, 300),
+            'Warangal': (400, 200),
+            'Nizamabad': (200, 100),
+            'Khammam': (500, 300),
+            'Karimnagar': (400, 100),
+            'Nalgonda': (300, 400),
+            'Mahbubnagar': (200, 400),
+            'Adilabad': (600, 200)
+        },
+        'edges': [
+            ('Hyderabad', 'Warangal'),
+            ('Hyderabad', 'Nalgonda'),
+            ('Warangal', 'Karimnagar'),
+            ('Nizamabad', 'Karimnagar'),
+            ('Nizamabad', 'Adilabad'),
+            ('Khammam', 'Nalgonda'),
+            ('Nalgonda', 'Mahbubnagar'),
+            ('Mahbubnagar', 'Adilabad')
+        ]
+    },
+    "Kerala": {
+        'capital': 'Thiruvananthapuram',
+        'nodes': {
+            'Thiruvananthapuram': (100, 500),
+            'Kollam': (200, 400),
+            'Kottayam': (300, 300),
+            'Alappuzha': (400, 400),
+            'Ernakulam': (500, 300),
+            'Thrissur': (600, 400),
+            'Palakkad': (700, 500),
+            'Malappuram': (800, 400),
+            'Kozhikode': (900, 300),
+            'Kannur': (1000, 200),
+            'Wayanad': (800, 200)
+        },
+        'edges': [
+            ('Thiruvananthapuram', 'Kollam'),
+            ('Kollam', 'Kottayam'),
+            ('Kottayam', 'Alappuzha'),
+            ('Alappuzha', 'Ernakulam'),
+            ('Ernakulam', 'Thrissur'),
+            ('Thrissur', 'Palakkad'),
+            ('Palakkad', 'Malappuram'),
+            ('Malappuram', 'Kozhikode'),
+            ('Kozhikode', 'Kannur'),
+            ('Kannur', 'Wayanad')
+        ]
+    },
+    "Tamil Nadu": {
+        'capital': 'Chennai',
+        'nodes': {
+            'Chennai': (500, 100),
+            'Coimbatore': (100, 400),
+            'Madurai': (200, 500),
+            'Tiruchirappalli': (300, 300),
+            'Salem': (400, 400),
+            'Tirunelveli': (500, 500),
+            'Vellore': (600, 300),
+            'Thanjavur': (700, 400),
+            'Dindigul': (800, 500),
+            'Kanyakumari': (900, 400)
+        },
+        'edges': [
+            ('Chennai', 'Vellore'),
+            ('Vellore', 'Salem'),
+            ('Salem', 'Coimbatore'),
+            ('Coimbatore', 'Madurai'),
+            ('Madurai', 'Dindigul'),
+            ('Dindigul', 'Thanjavur'),
+            ('Thanjavur', 'Tiruchirappalli'),
+            ('Tiruchirappalli', 'Tirunelveli'),
+            ('Tirunelveli', 'Kanyakumari')
+        ]
+    }
+}
+
+# Graph setup for third window
+G = nx.Graph()
+positions = {}
+
+
+def draw_first_window(screen):
+    """Draw the first window with an alert button."""
+    window_size = (width, height)
+    background = pygame.image.load(r"C:\Users\admin\Downloads\weather.jpeg")
+    background = pygame.transform.scale(background, window_size)
+    screen.blit(background, (0, 0))
+
+    alert_button = pygame.Rect(width - 150, height - 60, 140, 50)
+    pygame.draw.rect(screen, RED, alert_button)
+    alert_text = font.render("Alert", True, WHITE)
+    screen.blit(alert_text, (width - 120, height - 45))
+    # Play the first sound
+    notification_sound_first.play()
+
+    # Wait for the duration of the first sound
+    pygame.time.wait(int(notification_sound_first.get_length() * 1000))
+
+    # Play the second sound
+    notification_sound_second.play()
+
+
+def draw_second_window(screen):
+    """Draw the second window with a state name input box."""
+    window_size = (width, height)
+    # Stop the first sound
+    notification_sound_first.stop()
+
+    # Stop the second sound (if playing)
+    notification_sound_second.stop()
+    background = pygame.image.load(r"C:\Users\admin\Downloads\Map.jpeg")
+    background = pygame.transform.scale(background, window_size)
+    screen.blit(background, (0, 0))
+
+    prompt_text = font.render("Enter State Name:", True, BLACK)
+    screen.blit(prompt_text, (50, 50))
+
+    input_box = pygame.Rect(50, 100, 300, 50)
+    pygame.draw.rect(screen, BLACK, input_box, 2)
+    user_text = font.render(state_name, True, BLACK)
+    screen.blit(user_text, (60, 110))
+
+    enter_button = pygame.Rect(400, 100, 100, 50)
+    pygame.draw.rect(screen, BLUE, enter_button)
+    enter_text = font.render("Enter", True, WHITE)
+    screen.blit(enter_text, (415, 110))
+
+
+def draw_third_window(screen):
+    """Draw the third window with the graph of the selected state."""
+    global G, positions
+    screen.fill(LIGHT_BLUE)
+    G.clear()
+    positions.clear()
+
+    if state_name in state_districts:
+        state_data = state_districts[state_name]
+        districts_data = state_data['nodes']
+        edges_data = state_data['edges']
+
+        for district, pos in districts_data.items():
+            positions[district] = pos
+            G.add_node(district)
+
+        for edge in edges_data:
+            G.add_edge(*edge)
+
+        draw_graph()
+        message_passing(state_data['capital'])
+
+
+def draw_graph(highlighted_edges=[], highlighted_nodes=[], travel_time_text="", green_nodes=[], popup_text=""):
+    """Draw the graph with highlighted edges and nodes."""
+
+    background = pygame.image.load(r"C:\Users\admin\Downloads\window3.jpeg")
+    background = pygame.transform.scale(background, (width, height))
+    screen.blit(background, (0, 0))  # Draw the background image here
+
+    for edge in G.edges:
+        color = GREEN if edge in highlighted_edges else BLACK
+        pygame.draw.line(screen, color, positions[edge[0]], positions[edge[1]], 2)
+
+    for node, pos in positions.items():
+        node_width = 100
+        node_height = 50
+        color = GREEN if node in highlighted_nodes else RED
+        if node in green_nodes:  # Check if the node is visited
+            color = GREEN
+        node_rect = pygame.Rect(pos[0] - node_width // 2, pos[1] - node_height // 2, node_width, node_height)
+        pygame.draw.ellipse(screen, color, node_rect)
+
+        font_size = min(node_width // 5, node_height // 3)
+        font = pygame.font.Font(None, font_size)
+
+        text = font.render(node, True, BLACK)
+        text_rect = text.get_rect(center=pos)
+        screen.blit(text, text_rect)
+
+        if node in timestamps:
+            timestamp_text = font.render(timestamps[node], True, BLACK)
+            timestamp_rect = timestamp_text.get_rect(midleft=(pos[0] + node_width // 2 + 10, pos[1]))
+            screen.blit(timestamp_text, timestamp_rect)
+
+    if travel_time_text:
+        time_text = font.render(travel_time_text, True, BLACK)
+        screen.blit(time_text, (50, 50))
+
+    if popup_text:
+        popup_font = pygame.font.Font(None, 32)
+        popup = popup_font.render(popup_text, True, RED)
+        screen.blit(popup, (width // 2, 50))
+
+    pygame.display.flip()
+
+
+def message_passing(start_node):
+    """Perform message passing through the graph starting from start_node."""
+    global message_sent
+    visited = set()
+    queue = [start_node]
+    highlighted_edges = []
+    highlighted_nodes = []
+
+    while queue:
+        current = queue.pop(0)
+        if current in visited:
+            continue
+        visited.add(current)
+        highlighted_nodes.append(current)
+        timestamps[current] = time.strftime("%H:%M:%S", time.localtime())  # Store the timestamp
+        draw_graph(highlighted_edges, highlighted_nodes)
+        pygame.time.wait(500)
+
+        for edge in G.edges:
+            if current in edge:
+                next_node = edge[1] if edge[0] == current else edge[0]
+                if next_node not in visited:
+                    queue.append(next_node)
+                    highlighted_edges.append(edge)
+                    animate_impulse(current, next_node, visited)  # Pass visited nodes to animate_impulse
+
+    draw_graph(highlighted_edges, highlighted_nodes)
+    font = pygame.font.Font(None, 64)
+    alert_sent_text = font.render("Alert Sent", True, RED)
+    text_rect = alert_sent_text.get_rect(center=(width // 2, height // 2))
+    screen.blit(alert_sent_text, text_rect)
+    pygame.display.flip()
+    pygame.time.wait(2000)
+    message_sent = True
+
+
+def animate_impulse(from_node, to_node, visited_nodes):
+    """Animate an impulse traveling from one node to another and display travel time."""
+    start_time = time.time()
+    start_pos = positions[from_node]
+    end_pos = positions[to_node]
+    num_steps = 20
+
+    for step in range(num_steps):
+        interp_x = start_pos[0] + (end_pos[0] - start_pos[0]) * (step / num_steps)
+        interp_y = start_pos[1] + (end_pos[1] - start_pos[1]) * (step / num_steps)
+        draw_graph(green_nodes=visited_nodes)  # Pass visited nodes to color them green
+        pygame.draw.circle(screen, RED, (int(interp_x), int(interp_y)), 10)
+        pygame.display.flip()
+        pygame.time.wait(50)
+
+    end_time = time.time()
+    travel_time = end_time - start_time
+    travel_time_text = f"Travel time from {from_node} to {to_node}: {travel_time:.2f} seconds"
+    popup_text = f"Message received to {to_node}"
+    draw_graph(travel_time_text=travel_time_text, green_nodes=visited_nodes,
+               popup_text=popup_text)  # Pass visited nodes to color them green
+    pygame.time.wait(2000)  # Wait to allow the user to see the travel time
+
+    notification_sound_third.play()
+
+# Main game loop
+running = True
+screen = pygame.display.set_mode((width, height))
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if current_window == 1:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_pos = event.pos
+                if width - 150 <= mouse_pos[0] <= width - 10 and height - 60 <= mouse_pos[1] <= height - 10:
+                    current_window = 2
+
+        elif current_window == 2:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    current_window = 3
+                elif event.key == pygame.K_BACKSPACE:
+                    state_name = state_name[:-1]
+                else:
+                    state_name += event.unicode
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_pos = event.pos
+                if 400 <= mouse_pos[0] <= 500 and 100 <= mouse_pos[1] <= 150:
+                    current_window = 3
+
+        elif current_window == 3:
+            if not message_sent:
+                draw_third_window(screen)
+            else:
+                running = False
+
+    if current_window == 1:
+        draw_first_window(screen)
+    elif current_window == 2:
+        draw_second_window(screen)
+
+    pygame.display.flip()
+
+pygame.quit()
+sys.exit()
