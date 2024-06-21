@@ -1,0 +1,741 @@
+import pygame
+import sys
+import cv2
+import os
+import json
+
+# Initialize Pygame
+pygame.init()
+
+# Define colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+RED = (255, 0, 0)
+CHAR_GRAY = (54, 69, 79)
+PINK = (255, 234, 234)
+PALE_BLUE = (173, 216, 230)
+LIGHT = (0, 64, 128)
+BEIGE = (245, 245, 220)
+CORAL = (255, 127, 80)
+PEACH = (255, 218, 185)
+SILVER = (192, 192, 192)
+
+# Set up font
+font = pygame.font.SysFont('timesnewroman', 48)
+
+# Define button dimensions and positions
+button_width = 200
+button_height = 50
+button_x = 400
+button_y = 550  # Adjusted button Y position
+clock = pygame.time.Clock()
+
+welcome_sound = pygame.mixer.Sound(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\welcome.mp3")
+
+# Load video
+video_path = r"C:\Users\shyam\OneDrive\Pictures\Screenshots\projectvdo.mp4"
+cap = cv2.VideoCapture(video_path)
+
+
+if not cap.isOpened():
+    print("Error: Could not open video.")
+    pygame.quit()
+    sys.exit()
+
+# Define the function to draw buttons
+def draw_button(screen, color, x, y, width, height, text):
+    pygame.draw.rect(screen, color, (x, y, width, height))
+    font = pygame.font.Font(None, 36)
+    text_surf = font.render(text, True, BLACK)
+    text_rect = text_surf.get_rect(center=(x + width // 2, y + height // 2))
+    screen.blit(text_surf, text_rect)
+
+def read_members():
+    members = {}
+    with open('members.txt', 'r') as file:
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                username, password, balance = line.split()
+                members[username] = {'password': password, 'balance': float(balance)}
+            except ValueError:
+                print(f"Skipping malformed line: {line}")
+                continue
+    return members
+
+def write_members(members):
+    with open('members.txt', 'w') as file:
+        for username, info in members.items():
+            file.write(f"{username} {info['password']} {info['balance']}\n")
+
+def validate_login(username, password):
+    members = read_members()
+    return members.get(username) and members[username]['password'] == password
+
+def update_balance(username, amount):
+    members = read_members()
+    if username in members:
+        members[username]['balance'] += amount
+        write_members(members)
+        return True
+    return False
+
+def get_balance(username):
+    members = read_members()
+    if username in members:
+        return members[username]['balance']
+    return None
+
+def welcome_screen(screen, username):
+    screen.fill(BEIGE)
+    font_large = pygame.font.Font(None, 74)
+    welcome_text = font_large.render(f"Welcome, {username}!", True, CORAL)
+    screen.blit(welcome_text, (200, 200))
+    pygame.display.flip()
+    pygame.time.delay(2000)
+
+# Error message display function
+def show_error(screen, message):
+    screen.fill(RED)
+    font_large = pygame.font.Font(None, 74)
+    error_text = font_large.render(message, True, WHITE)
+    screen.blit(error_text, (200, 200))
+    pygame.display.flip()
+    pygame.time.delay(2000)
+
+# Function to handle login
+def login_function(screen):
+    print("Login Function")
+    font = pygame.font.Font(None, 44)
+    text = font.render("Welcome! Please Enter Your Login Details", True, CORAL)
+    screen.blit(text, (100, 50))  # Adjusted login text position
+
+    # Draw username and password fields
+    font_small = pygame.font.Font(None, 36)
+    username_text = font_small.render("USERNAME:", True, BLACK)
+    password_text = font_small.render("PASSWORD:", True, BLACK)
+    screen.blit(username_text, (200, 200))
+    screen.blit(password_text, (200, 300))
+
+    # Draw input boxes
+    username_box = pygame.Rect(400, 200, 400, 50)
+    password_box = pygame.Rect(400, 300, 400, 50)
+    pygame.draw.rect(screen, WHITE, username_box, 2)
+    pygame.draw.rect(screen, WHITE, password_box, 2)
+
+    # Draw submit button
+    submit_button = pygame.Rect(450, 400, 100, 50)  # Adjusted submit button position
+    pygame.draw.rect(screen, PEACH, submit_button)
+    submit_text = font_small.render("Submit", True, BLACK)
+    screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+
+    # Draw back button
+    back_button = pygame.Rect(50, 550, 100, 50)
+    pygame.draw.rect(screen, SILVER, back_button)
+    back_text = font_small.render("Back", True, BLACK)
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+
+    pygame.display.flip()
+
+    username = ""
+    password = ""
+    active_box = None
+    error_message = ""
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if username_box.collidepoint(event.pos):
+                    active_box = "username"
+                elif password_box.collidepoint(event.pos):
+                    active_box = "password"
+                elif submit_button.collidepoint(event.pos):
+                    if validate_login(username, password):
+                        welcome_screen(screen, username)  # Show the welcome screen with username
+                        main_menu(screen, username)  # Show the main menu
+                        return True
+                    else:
+                        show_error(screen, "Incorrect username or password")
+                        return False
+                elif back_button.collidepoint(event.pos):
+                    return False
+            if event.type == pygame.KEYDOWN:
+                if active_box == "username":
+                    if event.key == pygame.K_BACKSPACE:
+                        username = username[:-1]
+                    else:
+                        username += event.unicode
+                elif active_box == "password":
+                    if event.key == pygame.K_BACKSPACE:
+                        password = password[:-1]
+                    else:
+                        password += event.unicode
+
+        # Redraw the screen to update text input
+        screen.fill(BEIGE)
+        screen.blit(text, (300, 50))
+        screen.blit(username_text, (200, 200))
+        screen.blit(password_text, (200, 300))
+        pygame.draw.rect(screen, WHITE, username_box, 2)
+        pygame.draw.rect(screen, WHITE, password_box, 2)
+        screen.blit(font_small.render(username, True, BLACK), (username_box.x + 5, username_box.y + 5))
+        screen.blit(font_small.render("*" * len(password), True, BLACK), (password_box.x + 5, password_box.y + 5))
+        pygame.draw.rect(screen, PEACH, submit_button)
+        screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+        pygame.draw.rect(screen, SILVER, back_button)
+        screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+
+        # Display error message if login failed
+        if error_message:
+            error_text = font_small.render(error_message, True, RED)
+            screen.blit(error_text, (400, 500))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+# Function to handle sign up
+def signup_window(screen):
+    screen.fill(PALE_BLUE)
+    font_large = pygame.font.SysFont(None, 48)
+    welcome_text = font_large.render("Join our Bank: Sign Up ", True, BLACK)
+    screen.blit(welcome_text, (400, 50))
+
+    font_medium = pygame.font.Font(None, 30)
+    labels = ["Username:", "Password (include letters,numbers):", "Confirm Password:", "Initial Amount (Minimum Rs. 1000):"]
+    input_fields = {}
+    input_values = [""] * len(labels)
+    active_box = None
+
+    for i, label in enumerate(labels):
+        label_text = font_medium.render(label, True, BLACK)
+        label_rect = label_text.get_rect(topleft=(50, 150 + i * 80))
+        screen.blit(label_text, label_rect)
+        input_fields[i] = pygame.Rect(450, 150 + i * 80, 450, 40)
+        pygame.draw.rect(screen, BLACK, input_fields[i], 2)
+
+    submit_button = pygame.Rect(450, 600, 100, 50)
+    pygame.draw.rect(screen, GREEN, submit_button)
+    submit_text = font_medium.render("Submit", True, BLACK)
+    screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+
+    pygame.display.flip()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for i, rect in input_fields.items():
+                    if rect.collidepoint(event.pos):
+                        active_box = i
+                if submit_button.collidepoint(event.pos):
+                    username, password, confirm_password, deposit = input_values
+                    if password != confirm_password:
+                        show_error(screen, "Passwords do not match")
+                        return False
+                    if float(deposit) < 1000:
+                        show_error(screen, "Initial deposit must be at least Rs. 1000")
+                        return False
+                    members = read_members()
+                    if username in members:
+                        show_error(screen, "Username already exists")
+                        return False
+                    members[username] = {'password': password, 'balance': float(deposit)}
+                    write_members(members)
+                    welcome_screen(screen, username)
+                    main_menu(screen, username)
+                    return True
+            if event.type == pygame.KEYDOWN:
+                if active_box is not None:
+                    if event.key == pygame.K_BACKSPACE:
+                        input_values[active_box] = input_values[active_box][:-1]
+                    else:
+                        input_values[active_box] += event.unicode
+
+        screen.fill(PALE_BLUE)
+        screen.blit(welcome_text, (400, 50))
+
+        for i, label in enumerate(labels):
+            label_text = font_medium.render(label, True, BLACK)
+            label_rect = label_text.get_rect(topleft=(50, 150 + i * 80))
+            screen.blit(label_text, label_rect)
+            pygame.draw.rect(screen, BLACK, input_fields[i], 2)
+            display_text = input_values[i] if i != 1 and i != 2 else '*' * len(input_values[i])
+            screen.blit(font_medium.render(display_text, True, BLACK), (input_fields[i].x + 5, input_fields[i].y + 5))
+
+        pygame.draw.rect(screen, GREEN, submit_button)
+        screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+
+check_balance_img = pygame.image.load(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\balance.png.jpg")
+deposit_img = pygame.image.load(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\deposit.png.jpg")
+withdraw_img = pygame.image.load(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\withdraw.png")
+transfer_img = pygame.image.load(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\transfer.png.jpg")
+print_receipt_img = pygame.image.load(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\receipt.png.jpg")
+logout_img = pygame.image.load(r"C:\Users\shyam\OneDrive\Pictures\Screenshots\logout.png.jpg")
+
+# Adjust the size of the icons
+icon_size = (60, 60)  # Increased icon size
+check_balance_img = pygame.transform.scale(check_balance_img, icon_size)
+deposit_img = pygame.transform.scale(deposit_img, icon_size)
+withdraw_img = pygame.transform.scale(withdraw_img, icon_size)
+transfer_img = pygame.transform.scale(transfer_img, icon_size)
+print_receipt_img = pygame.transform.scale(print_receipt_img, icon_size)
+logout_img = pygame.transform.scale(logout_img, icon_size)
+
+# Button class
+class Button:
+    def __init__(self, x, y, width, height, text, image):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.image = image
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, GREEN, self.rect)
+        font = pygame.font.Font(None, 36)
+        text_surf = font.render(self.text, True, BLACK)
+        text_rect = text_surf.get_rect(center=(self.rect.x + self.rect.width // 2, self.rect.y + self.rect.height // 2))
+        surface.blit(text_surf, text_rect)
+        surface.blit(self.image, (self.rect.x + self.rect.width + 10, self.rect.y + (self.rect.height - self.image.get_height()) // 2))
+
+    def is_clicked(self, pos):
+        return self.rect.collidepoint(pos)
+
+# Increase button size
+button_width = 300
+button_height = 70
+
+# Create buttons with new sizes
+check_balance_button = Button(100, 150, button_width, button_height, "Check Balance", check_balance_img)
+deposit_button = Button(100, 230, button_width, button_height, "Deposit", deposit_img)
+withdraw_button = Button(100, 310, button_width, button_height, "Withdraw", withdraw_img)
+transfer_button = Button(100, 390, button_width, button_height, "Transfer", transfer_img)
+print_receipt_button = Button(100, 470, button_width, button_height, "Print Receipt", print_receipt_img)
+logout_button = Button(100, 550, button_width, button_height, "Logout", logout_img)
+
+# Main menu function
+def main_menu(screen, username):
+    while True:
+        screen.fill(PALE_BLUE)
+        font_large = pygame.font.Font(None, 54)
+        menu_text = font_large.render("Main Menu : Explore Your Options", True, BLACK)
+        screen.blit(menu_text, (100, 50))
+
+        # Draw buttons and icons
+        check_balance_button.draw(screen)
+        deposit_button.draw(screen)
+        withdraw_button.draw(screen)
+        transfer_button.draw(screen)
+        print_receipt_button.draw(screen)
+        logout_button.draw(screen)
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for button in [check_balance_button, deposit_button, withdraw_button, transfer_button, print_receipt_button, logout_button]:
+                    if button.is_clicked(event.pos):
+                        if button.text == "Check Balance":
+                            check_balance(screen, username)
+                        elif button.text == "Deposit":
+                            deposit(screen, username)
+                        elif button.text == "Withdraw":
+                            withdraw(screen, username)
+                        elif button.text == "Transfer":
+                            transfer(screen, username)
+                        elif button.text == "Print Receipt":
+                            print_receipt(screen, username)
+                        elif button.text == "Logout":
+                            return
+all_transactions = []
+
+# Function to check balance
+def check_balance(screen, username):
+    screen.fill(PALE_BLUE)
+    font_large = pygame.font.Font(None, 54)
+    balance_text = font_large.render("Your Account Balance", True, BLACK)
+    screen.blit(balance_text, (400, 50))
+
+    balance = get_balance(username)
+    if balance is not None:
+        balance_display = font_large.render(f"Rs. {balance:.2f}", True, BLACK)
+        screen.blit(balance_display, (200, 200))
+    else:
+        error_text = font_large.render("Error retrieving balance", True, RED)
+        screen.blit(error_text, (400, 200))
+    back_button = pygame.Rect(50, 650, 200, 75)
+    pygame.draw.rect(screen, SILVER, back_button)
+    back_text = font_large.render("Back", True, BLACK)
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+    pygame.display.flip()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if back_button.collidepoint(event.pos):
+                    return False
+    pygame.draw.rect(screen, SILVER, back_button)
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+    pygame.display.flip()
+    pygame.time.delay(30)
+
+# Function to deposit money
+def deposit(screen, username):
+    screen.fill(PALE_BLUE)
+    font_large = pygame.font.Font(None, 74)
+    deposit_text = font_large.render("Make a Deposit", True, BLACK)
+    screen.blit(deposit_text, (400, 50))
+
+    font_medium = pygame.font.Font(None, 36)
+    amount_text = font_medium.render("Enter amount:", True, BLACK)
+    screen.blit(amount_text, (200, 200))
+
+    input_box = pygame.Rect(400, 200, 200, 50)
+    pygame.draw.rect(screen, WHITE, input_box, 2)
+
+    submit_button = pygame.Rect(450, 300, 100, 50)
+    pygame.draw.rect(screen, GREEN, submit_button)
+    submit_text = font_medium.render("Submit", True, BLACK)
+    screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+
+    back_button = pygame.Rect(50, 650,100, 50)
+    pygame.draw.rect(screen, SILVER, back_button)
+    back_text = font_medium.render("Back", True, BLACK)
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+    
+
+    pygame.display.flip()
+
+    amount = ""
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    amount = amount[:-1]
+                else:
+                    amount += event.unicode
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if submit_button.collidepoint(event.pos):
+                    if amount.isdigit() and int(amount) > 0:
+                        update_balance(username, int(amount))
+                        show_message(screen, f"Deposited Rs. {amount}")
+                        all_transactions.append(f"Deposited: {amount}")
+                        return
+                    else:
+                        show_error(screen, "Invalid amount")
+                        return
+                elif back_button.collidepoint(event.pos):
+                    return False
+                
+        
+        screen.fill(PALE_BLUE)
+        screen.blit(deposit_text, (400, 50))
+        screen.blit(amount_text, (200, 200))
+        pygame.draw.rect(screen, WHITE, input_box, 2)
+        screen.blit(font_medium.render(amount, True, BLACK), (input_box.x + 5, input_box.y + 5))
+        pygame.draw.rect(screen, GREEN, submit_button)
+        screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+        pygame.draw.rect(screen, SILVER, back_button)
+        screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+
+        pygame.display.flip()
+        clock.tick(30)
+
+# Function to withdraw money
+def withdraw(screen, username):
+    screen.fill(PALE_BLUE)
+    font_large = pygame.font.Font(None, 54)
+    withdraw_text = font_large.render("Withdraw Cash Here", True, BLACK)
+    screen.blit(withdraw_text, (400, 50))
+
+    font_medium = pygame.font.Font(None, 36)
+    amount_text = font_medium.render("Enter amount:", True, BLACK)
+    screen.blit(amount_text, (200, 200))
+
+    input_box = pygame.Rect(400, 200, 200, 50)
+    pygame.draw.rect(screen, WHITE, input_box, 2)
+
+    submit_button = pygame.Rect(450, 300, 100, 50)
+    pygame.draw.rect(screen, GREEN, submit_button)
+    submit_text = font_medium.render("Submit", True, BLACK)
+    screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+    
+    back_button = pygame.Rect(50, 650,100, 50)
+    pygame.draw.rect(screen, SILVER, back_button)
+    back_text = font_medium.render("Back", True, BLACK)
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+    pygame.display.flip()
+
+    amount = ""
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    amount = amount[:-1]
+                else:
+                    amount += event.unicode
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if submit_button.collidepoint(event.pos):
+                    if amount.isdigit() and int(amount) > 0:
+                        if get_balance(username) - int(amount) < 1000 and get_balance(username) - int(amount) >0:
+                            show_error(screen, "Maintain minimum Rs.1000")
+                            return
+                        elif get_balance(username) >= int(amount):
+                            update_balance(username, -int(amount))
+                            show_message(screen, f"Withdrawn Rs. {amount}")
+                            all_transactions.append(f"Withdrawn: {amount}")
+                            return
+                       
+                        else:
+                            show_error(screen, "Insufficient balance")
+                            return
+                    else:
+                        show_error(screen, "Invalid amount")
+                        return
+                elif back_button.collidepoint(event.pos):
+                    return False
+        
+        screen.fill(PALE_BLUE)
+        screen.blit(withdraw_text, (400, 50))
+        screen.blit(amount_text, (200, 200))
+        pygame.draw.rect(screen, WHITE, input_box, 2)
+        screen.blit(font_medium.render(amount, True, BLACK), (input_box.x + 5, input_box.y + 5))
+        pygame.draw.rect(screen, GREEN, submit_button)
+        screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+        pygame.draw.rect(screen, SILVER, back_button)
+        screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+# Function to transfer money
+def transfer(screen, username):
+    screen.fill(PALE_BLUE)
+    font_large = pygame.font.Font(None, 54)
+    transfer_text = font_large.render("Transfer Funds Here", True, BLACK)
+    screen.blit(transfer_text, (400, 50))
+
+    font_medium = pygame.font.Font(None, 36)
+    recipient_text = font_medium.render("Recipient:", True, BLACK)
+    amount_text = font_medium.render("Amount:", True, BLACK)
+    screen.blit(recipient_text, (200, 200))
+    screen.blit(amount_text, (200, 300))
+
+    recipient_box = pygame.Rect(400, 200, 200, 50)
+    amount_box = pygame.Rect(400, 300, 200, 50)
+    pygame.draw.rect(screen, WHITE, recipient_box, 2)
+    pygame.draw.rect(screen, WHITE, amount_box, 2)
+
+    submit_button = pygame.Rect(450, 400, 100, 50)
+    pygame.draw.rect(screen, GREEN, submit_button)
+    submit_text = font_medium.render("Submit", True, BLACK)
+    screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+    
+    back_button = pygame.Rect(50, 650,100, 50)
+    pygame.draw.rect(screen, SILVER, back_button)
+    back_text = font_medium.render("Back", True, BLACK)
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+    pygame.display.flip()
+
+    recipient = ""
+    amount = ""
+    active_box = None
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if recipient_box.collidepoint(event.pos):
+                    active_box = "recipient"
+                elif amount_box.collidepoint(event.pos):
+                    active_box = "amount"
+                elif submit_button.collidepoint(event.pos):
+                    if amount.isdigit() and int(amount) > 0:
+                        if get_balance(username) - int(amount) < 1000 and get_balance(username) - int(amount) >0:
+                            show_error(screen, "Maintain minimum Rs.1000")
+                            return
+
+                        elif get_balance(username) >= int(amount):
+                            members = read_members()
+                            if recipient in members:
+                                update_balance(username, -int(amount))
+                                update_balance(recipient, int(amount))
+                                show_message(screen, f"Transferred Rs. {amount} to {recipient}")
+                                all_transactions.append(f"Transferred: {amount}")
+                                return
+                            else:
+                                show_error(screen, "Recipient not found")
+                                return
+                        else:
+                            show_error(screen, "Insufficient balance")
+                            return
+                    else:
+                        show_error(screen, "Invalid amount")
+                        return
+            if event.type == pygame.KEYDOWN:
+                if active_box == "recipient":
+                    if event.key == pygame.K_BACKSPACE:
+                        recipient = recipient[:-1]
+                    else:
+                        recipient += event.unicode
+                elif active_box == "amount":
+                    if event.key == pygame.K_BACKSPACE:
+                        amount = amount[:-1]
+                    else:
+                        amount += event.unicode
+                elif back_button.collidepoint(event.pos):
+                    return False
+
+        screen.fill(PALE_BLUE)
+        screen.blit(transfer_text, (400, 50))
+        screen.blit(recipient_text, (200, 200))
+        screen.blit(amount_text, (200, 300))
+        pygame.draw.rect(screen, WHITE, recipient_box, 2)
+        pygame.draw.rect(screen, WHITE, amount_box, 2)
+        screen.blit(font_medium.render(recipient, True, BLACK), (recipient_box.x + 5, recipient_box.y + 5))
+        screen.blit(font_medium.render(amount, True, BLACK), (amount_box.x + 5, amount_box.y + 5))
+        pygame.draw.rect(screen, GREEN, submit_button)
+        screen.blit(submit_text, (submit_button.x + 10, submit_button.y + 10))
+        pygame.draw.rect(screen, SILVER, back_button)
+        screen.blit(back_text, (back_button.x + 10, back_button.y + 10))
+
+        pygame.display.flip()
+        clock.tick(30)
+def print_receipt(screen, username):
+    screen.fill(PINK)
+    
+    # Heading
+    font_large = pygame.font.Font(None, 74)
+    heading_text = font_large.render("Your Transactions", True, BLACK)
+    screen.blit(heading_text, (200, 20))  # Adjusted position for heading
+    
+    # Transaction details
+    font_medium = pygame.font.Font(None, 36)
+    y_offset = 120  # Adjusted starting y-coordinate for transaction details
+    for transaction in all_transactions:
+        text = font_medium.render(transaction, True, BLACK)
+        screen.blit(text, (100, y_offset))  # Adjusted position for transaction details
+        y_offset += 50
+    
+    # Back button
+    font_small = pygame.font.Font(None, 24)
+    back_text = font_small.render("Back", True, BLACK)
+    back_button = pygame.Rect(20, 650, 80, 40)
+    pygame.draw.rect(screen, SILVER, back_button)  # Adjusted button color
+    screen.blit(back_text, (back_button.x + 10, back_button.y + 10))  # Adjusted text position
+
+    pygame.display.flip()
+    
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if back_button.collidepoint(event.pos):
+                    return
+    
+        pygame.time.Clock().tick(30)
+
+
+# Function to show messages
+def show_message(screen, message):
+    screen.fill(BEIGE)
+    font_large = pygame.font.Font(None, 74)
+    message_text = font_large.render(message, True, BLACK)
+    screen.blit(message_text, (200, 200))
+    pygame.display.flip()
+    pygame.time.delay(2000)
+
+# Main function
+def main():
+    logged_in = False  # Flag to track login status
+    signed_up = False  # Flag to track sign-up status
+    screen = pygame.display.set_mode((1000, 800))
+    pygame.display.set_caption("http://horizonbank.org")
+    welcome_sound.play()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                if button_x < mouse_x < button_x + button_width and button_y < mouse_y < button_y + button_height:
+                    if login_function(screen):
+                        logged_in = True  # Set login
+                elif button_x < mouse_x < button_x + button_width and button_y + 140 < mouse_y < button_y + 140 + button_height:
+                    if signup_window(screen):
+                        signed_up = True  # Set sign-up
+
+
+        # If logged in or signed up, switch to the main dashboard
+        if logged_in or signed_up:
+            welcome_screen(screen, username)  # Call main_dashboard function
+            return  # Exit main() function
+
+        # Display the video
+        ret, frame = cap.read()
+        if ret:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.resize(frame, (1000, 800))
+            frame_surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
+            screen.blit(frame_surface, (0, 0))
+        else:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+        # Draw the top text
+        font_large = pygame.font.SysFont('timesnewroman', 48)
+        welcome_text = font_large.render("Welcome to Horizon Bank", True, BLACK)
+        screen.blit(welcome_text, (250, 40))
+
+        draw_button(screen, PALE_BLUE, button_x-40, button_y+30, button_width -20, button_height -20, "Login")
+
+        # Draw the sign-up button
+        draw_button(screen, PINK, button_x-40, button_y + 140, button_width -20, button_height -20, "Sign Up")
+
+
+        # Draw the text above the login and sign-up buttons
+        font_small = pygame.font.Font(None, 36)
+        login_prompt_text = font_small.render("Already have an account?", True, BLACK)
+        signup_prompt_text = font_small.render("Don't have an account yet?", True, BLACK)
+        screen.blit(login_prompt_text, (button_x -50, button_y ))  # Adjusted prompt position
+        screen.blit(signup_prompt_text, (button_x - 50, button_y + 115))  # Adjusted prompt position
+
+        pygame.display.flip()
+        clock.tick(30)
+
+# Run the main function
+if __name__ == "__main__":
+    main()
+	
