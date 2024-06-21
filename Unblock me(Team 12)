@@ -1,0 +1,245 @@
+import tkinter as tk
+import imageio
+import pygame
+from PIL import Image, ImageTk
+from tkinter import messagebox
+
+class GameApp:
+    def _init_(self, root):
+        self.root = root
+        self.root.title("Game Launcher")
+        # Initialize pygame mixer
+        pygame.mixer.init()
+
+        # Load sounds
+        self.sound_button_click = pygame.mixer.Sound("C:\\Users\\daker\\Desktop\\python project\\dynamite-instrumental.mp3")
+        self.sound_hidden_message = pygame.mixer.Sound("C:\\Users\\daker\\Desktop\\python project\\dynamite-instrumental.mp3")
+        self.sound_timeout = pygame.mixer.Sound("C:\\Users\\daker\\Desktop\\python project\\dynamite-instrumental.mp3")
+        self.sound_warning = pygame.mixer.Sound("C:\\Users\\daker\\Desktop\\python project\\dynamite-instrumental.mp3")
+
+        # Load the background image
+        self.background_image = tk.PhotoImage(file="C:\\Users\\daker\\Downloads\\Treasure.png")
+
+        # Create a canvas to hold the background image
+        self.canvas = tk.Canvas(root, width=self.background_image.width(), height=self.background_image.height())
+        self.canvas.pack()
+
+        # Place the background image on the canvas
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.background_image)
+
+        # Create a start button
+        self.start_button = tk.Button(root, text="Start Game", command=self.start_game)
+        self.start_button.pack(pady=10)
+
+        self.timer = None  # Timer variable
+        self.time_limit = 240  # 4 minutes time limit (in seconds)
+        self.warning_time = 60  # Time left to show the warning (1 minute in seconds)
+        # self.countdown_label = tk.Label(self.root, text="", font=("Helvetica", 12), fg="red")
+        # self.countdown_label.pack()
+
+        # Game state variables
+        self.hidden_message_found = False
+        self.second_hidden_message_found = False
+        self.third_hidden_message_found = False
+        self.fourth_hidden_message_found = False
+        self.hint_clicked = False
+        self.hint_window = None
+
+    def start_game(self):
+        pygame.mixer.Sound.play(self.sound_button_click)  # Play button click sound
+        self.start_button.pack_forget()  # Hide the start button
+        # Load and play the video
+        video_path = "C:\\Users\\daker\\Downloads\\Instructions (1) (1).gif"  # Update this with your video file path
+        video = imageio.get_reader(video_path)
+        self.play_video(video)
+        # Start the countdown timer
+        self.update_countdown(self.time_limit)
+
+    def update_countdown(self, time_left):
+        # minutes, seconds = divmod(time_left, 60)
+        # time_format = f"{minutes:02}:{seconds:02}"
+        # self.countdown_label.config(text=f"Time left: {time_format}")
+
+        if time_left > 0:
+            if time_left == self.warning_time:
+                pygame.mixer.Sound.play(self.sound_warning)  # Play warning sound
+                self.show_warning()
+            self.timer = self.root.after(1000, self.update_countdown, time_left - 1)
+        else:
+            self.timeout()
+
+    def show_warning(self):
+        messagebox.showwarning("Warning", "You have 1 minute left before the game exits.")
+
+    def play_video(self, video):
+        def update_frame(frame_index):
+            if frame_index < len(frames):
+                frame = frames[frame_index]
+                self.canvas.create_image(0, 0, anchor=tk.NW, image=frame)
+                self.canvas.image = frame  # Keep a reference to prevent garbage collection
+                self.root.after(50, update_frame, frame_index + 1)  # Adjust the delay between frames as needed
+            else:
+                self.show_next_button()  # After the last frame, show the next button
+
+        frames = [ImageTk.PhotoImage(Image.fromarray(frame)) for frame in video.iter_data()]
+        update_frame(0)
+
+    def show_next_button(self):
+        self.next_button = tk.Button(self.root, text="Next", command=self.open_next_page)
+        self.canvas.create_window(self.canvas.winfo_width() // 2, self.canvas.winfo_height() // 2, window=self.next_button)
+
+    def open_next_page(self):
+        pygame.mixer.Sound.play(self.sound_button_click)  # Play button click sound
+        self.root.after_cancel(self.timer)  # Cancel the timer if Next button is clicked before timeout
+        self.canvas.delete("all")  # Clear the canvas
+        self.canvas.pack_forget()
+        self.root.title("2x2 Image Grid")
+        self.root.attributes('-fullscreen', True)  # Make the window full-screen
+
+        # Load and crop the background image
+        background_image_path = "C:\\Users\\daker\\Downloads\\level2.png"  # Change this to your background image path
+        background_image = Image.open(background_image_path)
+        background_image = background_image.resize((self.root.winfo_screenwidth(), self.root.winfo_screenheight()))
+        background_photo = ImageTk.PhotoImage(background_image)
+
+        # Create a new Canvas widget and place it in the main window
+        self.canvas = tk.Canvas(self.root, width=self.root.winfo_screenwidth(), height=self.root.winfo_screenheight())
+        self.canvas.pack(fill="both", expand=True)
+
+        # Add the background image to the canvas
+        self.canvas.create_image(0, 0, image=background_photo, anchor="nw")
+        self.canvas.image = background_photo  # Keep a reference to prevent garbage collection
+
+        # Bind the canvas to detect clicks near the hidden button location
+        self.canvas.bind("<Button-1>", self.check_hidden_message)
+
+        # Create an exit button
+        exit_button = tk.Button(self.root, text="Exit", command=self.exit_app, bg="lightblue")
+        self.canvas.create_window(20, self.root.winfo_screenheight() - 60, anchor="nw", window=exit_button)
+
+        # Create a hint button (optional, for demonstration)
+        hint_button = tk.Button(self.root, text="Hint", command=self.show_hint, bg="lightblue")
+        self.canvas.create_window(self.root.winfo_screenwidth() - 80, self.root.winfo_screenheight() - 60, anchor="nw", window=hint_button)
+
+        # Restart the timer for the new game phase
+        self.time_limit = 120  # 2 minutes time limit for the next level
+        self.update_countdown(self.time_limit)
+
+    def exit_app(self):
+        pygame.mixer.Sound.play(self.sound_button_click)  # Play button click sound
+        self.root.destroy()
+
+    def timeout(self):
+        pygame.mixer.Sound.play(self.sound_timeout)  # Play timeout sound
+        messagebox.showinfo("Time's Up!", "You didn't find all the hints in time. Exiting the game.")
+        self.exit_app()
+
+    def show_hint(self):
+        pygame.mixer.Sound.play(self.sound_button_click)  # Play button click sound
+        if self.hint_window is None or not self.hint_window.winfo_exists():
+            self.hint_window = tk.Toplevel(self.root)
+            self.hint_window.title("Hint Animation")
+            self.hint_window.geometry("400x400")  # Adjust as needed
+            self.hint_label = tk.Label(self.hint_window)
+            self.hint_label.pack()
+
+        # Load the animated GIF based on the state
+        if not self.hidden_message_found:
+            hint_image_path = "C:\\Users\\daker\\Pictures\\Hint21.gif"
+        elif self.hidden_message_found and not self.second_hidden_message_found:
+            hint_image_path = "C:\\Users\\daker\\Pictures\\Hint22.gif"
+        elif self.second_hidden_message_found and not self.third_hidden_message_found:
+            hint_image_path = "C:\\Users\\daker\\Pictures\\Hint23.gif"
+        else:
+            hint_image_path = "C:\\Users\\daker\\Pictures\\Hint24.gif"
+
+        img = Image.open(hint_image_path)
+
+        frames = []
+        try:
+            while True:
+                frames.append(ImageTk.PhotoImage(img.copy()))
+                img.seek(len(frames))  # Move to the next frame
+        except EOFError:
+            pass
+
+        def update_frame(frame_index):
+            if not self.hint_label.winfo_exists():
+                return  # Label widget doesn't exist, do nothing
+            frame = frames[frame_index]
+            self.hint_label.configure(image=frame)
+            self.hint_label.image = frame  # Keep a reference to prevent garbage collection
+            self.root.after(100, update_frame, (frame_index + 1) % len(frames))  # Adjust the delay as needed
+
+        update_frame(0)
+        self.hint_clicked = True  # Set hint_clicked to True after clicking on the hint button
+
+    def check_hidden_message(self, event):
+        if not self.hidden_message_found and self.hint_clicked:  # Check if the hint button has been clicked and the first hidden message is not yet found
+            x, y = event.x, event.y
+            button_x, button_y = 264, 650  # Adjust these coordinates to match the hidden button location
+            distance_threshold = 50  # Adjust as needed
+
+            # Calculate the distance between the click and the hidden button location
+            distance = ((x - button_x) ** 2 + (y - button_y) ** 2) ** 0.5
+
+            # If the distance is within the threshold, show the hidden message
+            if distance <= distance_threshold:
+                self.hidden_message_found = True  # Mark the hidden message as found
+                pygame.mixer.Sound.play(self.sound_hidden_message)  # Play hidden message sound
+                messagebox.showinfo("Hidden Message", "Congratulations! You found the hidden message.")
+                # Update the hint animation with the new GIF
+                self.show_hint()
+        elif self.hidden_message_found and not self.second_hidden_message_found:  # Check if the second hidden message can be revealed
+            x, y = event.x, event.y
+            second_button_x, second_button_y = 790, 530  # Adjust these coordinates to match the second hidden button location
+            second_distance_threshold = 70  # Adjust as needed
+
+            # Calculate the distance between the click and the second hidden button location
+            distance = ((x - second_button_x) ** 2 + (y - second_button_y) ** 2) ** 0.5
+
+            # If the distance is within the threshold, show the second hidden message
+            if distance <= second_distance_threshold:
+                self.second_hidden_message_found = True  # Mark the second hidden message as found
+                pygame.mixer.Sound.play(self.sound_hidden_message)  # Play hidden message sound
+                messagebox.showinfo("Second Hidden Message", "Congratulations! You found the second hidden message.")
+                # Update the hint animation with the new GIF
+                self.show_hint()
+        elif self.second_hidden_message_found and not self.third_hidden_message_found:  # Check if the third hidden message can be revealed
+            x, y = event.x, event.y
+            third_button_x, third_button_y = 1100, 530  # Adjust these coordinates to match the third hidden button location
+            third_distance_threshold = 70  # Adjust as needed
+
+            # Calculate the distance between the click and the third hidden button location
+            distance = ((x - third_button_x) ** 2 + (y - third_button_y) ** 2) ** 0.5
+
+            # If the distance is within the threshold, show the third hidden message
+            if distance <= third_distance_threshold:
+                self.third_hidden_message_found = True  # Mark the third hidden message as found
+                pygame.mixer.Sound.play(self.sound_hidden_message)  # Play hidden message sound
+                messagebox.showinfo("Third Hidden Message", "Congratulations! You found the third hidden message.")
+                self.show_hint()  # Proceed to the next level
+        elif self.third_hidden_message_found and not self.fourth_hidden_message_found:  # Check if the fourth hidden message can be revealed
+            x, y = event.x, event.y
+            fourth_button_x, fourth_button_y = 1007, 688  # Adjust these coordinates to match the fourth hidden button location
+            fourth_distance_threshold = 80  # Adjust as needed
+
+            # Calculate the distance between the click and the fourth hidden button location
+            distance = ((x - fourth_button_x) ** 2 + (y - fourth_button_y) ** 2) ** 0.5
+
+            # If the distance is within the threshold, show the fourth hidden message
+            if distance <= fourth_distance_threshold:
+                self.fourth_hidden_message_found = True  # Mark the fourth hidden message as found
+                pygame.mixer.Sound.play(self.sound_hidden_message)  # Play hidden message sound
+                messagebox.showinfo("Fourth Hidden Message", "Congratulations! You found the fourth hidden message.")
+                if self.hidden_message_found and self.second_hidden_message_found and  self.third_hidden_message_found and self.fourth_hidden_message_found:
+                  messagebox.showinfo("YOU WON!", "CONGRATULATIONS! you found all hidden messages and won the game!")  
+        else:
+            messagebox.showinfo("No Hint Used", "You need to use the hint first to reveal the hidden message.")  
+
+# Create the main window
+root = tk.Tk()
+app = GameApp(root)
+
+# Run the GUI event loop
+root.mainloop()
