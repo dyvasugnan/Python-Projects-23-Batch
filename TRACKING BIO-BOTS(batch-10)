@@ -1,0 +1,487 @@
+import pygame
+import sys
+import cv2
+import tkinter as tk
+from PIL import Image, ImageTk
+from tkinter import messagebox
+import random
+
+# Initialize Pygame
+pygame.init()
+pygame.mixer.init()
+
+
+
+WIDTH, HEIGHT = 800, 600
+WHITE = (255, 255, 255)
+
+# Set up the display
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+# Set up the game state
+game_state = "start_menu"
+
+
+video_paths = [
+    'C:/Users/Lokula Alekhya/Desktop/pythonr/Press Start 2P (1).mp4',  # Start menu video
+    'C:/Users/Lokula Alekhya/Desktop/pythonr/instruction1neww.mp4',
+    'C:/Users/Lokula Alekhya/Desktop/pythonr/instruction2newwwww.mp4']
+
+videos = []
+for path in video_paths:
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        print(f"Error: Unable to open video file {path}")
+        sys.exit()
+    videos.append(cap)
+
+
+start_button_rect = pygame.Rect(WIDTH / 2 - 100, HEIGHT / 2 + 150 - 40, 200, 80)
+
+
+music_path = 'C:/Users/Lokula Alekhya/Desktop/pythonr/Super Mario Bros. Theme Song.mp3'
+pygame.mixer.music.load(music_path)
+pygame.mixer.music.play(-1)  # Play the music on loop
+
+
+
+def draw_start_menu():
+    global current_video_index
+    ret, frame = videos[current_video_index].read()
+    if not ret:
+        videos[current_video_index].set(cv2.CAP_PROP_POS_FRAMES, 0)
+        ret, frame = videos[current_video_index].read()
+        if not ret:
+            print("Error: Unable to read video frame")
+            return
+
+    frame = cv2.resize(frame, (WIDTH, HEIGHT))
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    pygame_frame = pygame.image.frombuffer(frame.tobytes(), frame.shape[1::-1], "RGB")
+    screen.blit(pygame_frame, (0, 0))
+
+    pygame.display.update()
+
+
+def handle_start_menu_events():
+    global game_state, current_video_index
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = event.pos
+            if start_button_rect.collidepoint(mouse_pos):
+                current_video_index += 1
+                if current_video_index >= len(videos):
+                    current_video_index = 0
+                    start_tkinter_game()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RIGHT:
+                current_video_index += 1
+                if current_video_index >= len(videos):
+                    current_video_index = 0
+                    start_tkinter_game()
+
+
+def start_tkinter_game():
+    pygame.quit()
+    root = tk.Tk()
+    game = Game(root)
+    root.mainloop()
+predefined_walls = {
+    (5, 5, "easy"): [(3, 2, 3, 2), (1, 2, 1, 4)],
+    (5, 5, "medium"): [(2, 2, 2, 4), (4, 1, 4, 1)],
+    (5, 5, "hard"): [(1, 1, 1, 1), (3, 2, 3, 4)],
+    (6, 6, "easy"): [(1, 2, 2, 2), (4, 1, 5, 1)],
+    (6, 6, "medium"): [(2, 1, 5, 1), (3, 3, 4, 3), (1, 4, 1, 4)],
+    (6, 6, "hard"): [(2,4,2,4),(4,3,5,3),(4,0,5,0),(0,2,0,2),(0,5,0,5)],
+    (7, 7, "easy"): [(5, 1, 6, 1), (2, 3, 2, 3)],
+    (7, 7, "medium"): [(2, 3, 3, 3), (3, 1, 6, 1), (3, 5, 4, 5)],
+    (7, 7, "hard"): [(2,1,4,1),(5,3,6,3),(1,3,2,3),(2,6,2,6),(4,5,6,5),(2,4,4,4)],
+    (8, 8, "easy"): [(4, 1, 7, 1), (2, 3, 4, 3)],
+    (8, 8, "medium"): [(2, 2, 5, 2), (5, 0, 5, 1), (1, 6, 4, 6)],
+    (8, 8, "hard"): [(0, 1, 2, 1), (4, 2, 7, 2), (3, 5, 6, 5), (2, 2, 2, 3)],
+    (9, 9, "easy"): [(6, 1, 8, 1), (2, 3, 3, 3)],
+    (9, 9, "medium"): [(6, 3, 8, 3), (2, 6, 7, 6), (3, 5, 5, 7)],
+    (9, 9, "hard"): [(1,2,1,4),(3,2,8,2),(3,5,3,8),(6,7,6,8),(6,5,8,5)],
+    (10, 10, "easy"): [(0, 6, 2, 6), (4, 5, 5, 5), (7, 1, 9, 1)],
+    (10, 10, "medium"): [(0, 8, 3, 8), (4, 3, 4, 5), (7, 2, 9, 2)],
+    (10, 10, "hard"): [(2,2,0,2),(3,2,9,2),(4,4,4,9),(6,6,6,9),(8,4,8,9)],
+}
+
+
+class Game:
+    move_sound = pygame.mixer.Sound(r"C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\bug-audio.wav")
+    start_sound = pygame.mixer.Sound(r"C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\start game.wav")
+    exit_sound = pygame.mixer.Sound(r"C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\exit2 (2).wav")
+    warning_sound = pygame.mixer.Sound(r"C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\warning.mp3")
+    sucksquare_window_sound = pygame.mixer.Sound(r"C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\no of.sucksquares.wav")
+    button_sound=pygame.mixer.Sound("C://Users//Lokula Alekhya//Desktop//pythonr//button clicking (1).wav")
+
+    def __init__(self, root):
+        self.root = root
+        self.root.geometry("1600x1600")
+        self.root.title("Stuck Squares Game")
+        self.background_image = tk.PhotoImage(
+            file="C:/Users/Lokula Alekhya/Desktop/pythonr/select grid size.png")
+
+        self.background_label = tk.Label(root, image=self.background_image)
+        self.background_label.place(x=0, y=0, relwidth=1, relheight=1)
+        self.root.configure(background="black")
+        self.wall_image = tk.PhotoImage(
+            file="C:/Users/Lokula Alekhya/Desktop/pythonr/wallsvaishu.png")
+
+
+        self.button_frame = tk.Frame(root, bg="black")
+        self.button_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+
+        buttons = [
+            ("5x5", 5, 5), ("6x6", 6, 6), ("7x7", 7, 7),
+            ("8x8", 8, 8), ("9x9", 9, 9), ("10x10", 10, 10),
+        ]
+
+        row = 0
+        col = 0
+        for text, m, n in buttons:
+            button = tk.Button(self.button_frame, text=text, command=lambda m=m, n=n: self.set_grid_size(m, n),
+                               font=("Comic Sans", 25))
+            button.grid(row=row, column=col, padx=10, pady=10)
+            col += 1
+            if col > 2:
+                col = 0
+                row += 1
+        self.player = None
+        self.goal = None
+        self.grid = []
+        self.walls = []
+        self.stuck_positions = []
+        self.path = []
+        self.difficulty = None
+        self.m = 0
+        self.n = 0
+        self.predefined_walls=[]
+        self.levels_window_opened = False
+        self.medium_warning_counter=3
+        pygame.mixer.init()
+        try:
+
+            self.move_sound=pygame.mixer.Sound("C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\bug-audio.wav")
+            self.warning_sound=pygame.mixer.Sound("C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\warning.mp3")
+            self.exit_sound=pygame.mixer.Sound("C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\exit2 (2).wav")
+            self.sucksquare_window_sound=pygame.mixer.Sound("C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\no of.sucksquares.wav")
+            self.start_sound=pygame.mixer.Sound("C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\start game.wav")
+            self.button_sound = pygame.mixer.Sound("C:\\Users\\Lokula Alekhya\\Desktop\\pythonr\\button clicking (1).wav")
+
+        except pygame.error as e:
+            print(f"error loading sound: {e}")
+
+    def set_grid_size(self, m, n):
+        self.m = m
+        self.n = n
+        self.open_levels_window()
+
+    def open_levels_window(self):
+        if self.levels_window_opened:
+            return
+        self.levels_window_opened = True
+        levels_window = tk.Toplevel(self.root)
+        levels_window.title("Select Difficulty Level")
+        levels_window.geometry("1600x1600")
+        background_image = tk.PhotoImage(
+            file="C:/Users/Lokula Alekhya/Desktop/pythonr/difficulty level.png")
+
+
+        background_label = tk.Label(levels_window, image=background_image)
+        background_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+
+        background_label.image = background_image
+        levels_window.configure(background="black")
+
+        button_y_positions = [0.4, 0.5, 0.6]
+
+
+        self.button_easy = tk.Button(levels_window, text="Easy",
+                                     command=lambda: self.set_difficulty("easy", levels_window),
+                                     font=("Comic Sans", 30))
+        self.button_easy.place(relx=0.5, rely=button_y_positions[0], anchor=tk.CENTER)
+
+        self.button_medium = tk.Button(levels_window, text="Medium",
+                                       command=lambda: self.set_difficulty("medium", levels_window),
+                                       font=("Comic Sans", 30))
+        self.button_medium.place(relx=0.5, rely=button_y_positions[1], anchor=tk.CENTER)
+
+        self.button_hard = tk.Button(levels_window, text="Hard",
+                                     command=lambda: self.set_difficulty("hard", levels_window),
+                                     font=("Comic Sans", 30))
+        self.button_hard.place(relx=0.5, rely=button_y_positions[2], anchor=tk.CENTER)
+        self.button_sound.play()
+
+
+
+    def set_difficulty(self, difficulty, window):
+        self.difficulty = difficulty
+        window.destroy()
+        self.start_game_window()
+
+    def start_game_window(self):
+        self.game_window = tk.Toplevel(self.root)
+        self.game_window.title("Stuck Squares Game Grid")
+        self.game_window.geometry("1600x1600")
+        self.game_window.configure(background="black")
+
+        self.game_window_bg_label = tk.Label(self.game_window)
+
+
+
+        self.canvas_frame = tk.Frame(self.game_window)
+        self.canvas_frame.pack(expand=True)
+        self.canvas = tk.Canvas(self.canvas_frame, width=600, height=600)
+        self.canvas.pack()
+
+        self.game_window.bind("<KeyPress>", self.on_key_press)
+        self.canvas.focus_set()
+
+        self.start_game()
+        self.start_sound.play()
+
+    def start_game(self):
+        try:
+            self.path = []
+            self.generate_random_walls(self.m, self.n)
+            self.stuck_positions = self.count_stuck_squares_func(self.m, self.n, self.walls)
+            self.draw_grid(self.m, self.n, self.walls)
+
+            self.player = (0, self.m - 1)
+            self.goal = (self.n - 1, 0)
+            self.update_player_position()
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def generate_random_walls(self, m, n):
+        grid_size = (self.m, self.n)
+        if (self.m, self.n, self.difficulty) in predefined_walls:
+            self.walls = predefined_walls[(self.m, self.n, self.difficulty)]
+        else:
+            self.walls = []
+
+    def count_stuck_squares_func(self, m, n, walls):
+        self.grid = [[0] * n for _ in range(m)]
+
+        for x1, y1, x2, y2 in walls:
+            for x in range(x1, x2 + 1):
+                for y in range(y1, y2 + 1):
+                    self.grid[m - 1 - y][x] = 1  # Adjust for bottom-left origin
+
+        stuck_positions = []
+        for y in range(m):
+            for x in range(n):
+                if self.grid[y][x] == 0:
+                    if not self.is_reachable(x, y, n, m):
+                        stuck_positions.append((x, y))
+
+        return stuck_positions
+
+    def is_reachable(self, x, y, n, m):
+        queue = [(x, y)]
+        visited = {(x, y)}
+
+        while queue:
+            cx, cy = queue.pop(0)
+            if cx == n - 1 and cy == 0:
+                return True
+            for dx, dy in [(1, 0), (0, -1)]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < n and 0 <= ny < m and (nx, ny) not in visited and self.grid[ny][nx] == 0:
+                    queue.append((nx, ny))
+                    visited.add((nx, ny))
+        return False
+
+    def draw_grid(self, m, n, walls):
+        self.canvas.delete("all")
+        self.cell_size = 600 // max(m, n)
+        self.cell_width = 800 / m
+        self.cell_height = 800 / n
+
+
+        for y in range(m):
+            for x in range(n):
+                color = "lightblue"
+                for x1, y1, x2, y2 in walls:
+                    if x1 <= x <= x2 and m - 1 - y2 <= y <= m - 1 - y1:  # Adjust for bottom-left origin
+                        self.canvas.create_image(x * self.cell_size, y * self.cell_size, image=self.wall_image,
+                                                 anchor=tk.NW)
+                        color = None  # No color fill for cells with wall image
+
+                if color:
+                    self.canvas.create_rectangle(
+                        x * self.cell_size, y * self.cell_size,
+                        (x + 1) * self.cell_size, (y + 1) * self.cell_size,
+                        fill=color
+                    )
+
+
+    def update_player_position(self):
+        self.canvas.delete("player")
+        self.canvas.delete("goal")
+
+        for px, py in self.path:  # Draw dots on the path
+            self.canvas.create_oval(
+                (px + 0.4) * self.cell_size, (py + 0.4) * self.cell_size,
+                (px + 0.6) * self.cell_size, (py + 0.6) * self.cell_size,
+                fill="white"
+            )
+
+        x, y = self.player
+        self.path.append((x, y))
+
+        self.canvas.create_text(
+            (x + 0.5) * self.cell_size, (y + 0.5) * self.cell_size,
+            text="🤖", font=("Arial", int(self.cell_size * 0.75)), tags="player"
+        )
+        self.canvas.create_rectangle(
+            self.goal[0] * self.cell_size, self.goal[1] * self.cell_size,
+            (self.goal[0] + 1) * self.cell_size, (self.goal[1] + 1) * self.cell_size,
+            fill="yellow", tags="goal"
+            )
+        self.canvas.create_text(
+            (self.goal[0] + 0.5) * self.cell_size, (self.goal[1] + 0.5) * self.cell_size,
+            text="🚪", font=("Arial", int(self.cell_size * 0.75)), tags="goal"
+        )
+        if (x,y)==self.goal:
+            print("player reached the goal")
+            self.exit_sound.play()
+        self.move_sound.play()
+
+    def on_key_press(self, event):
+        if not self.player:
+            return
+
+        x, y = self.player
+        moved = False
+
+        if event.keysym == "Up" and y > 0 and (self.grid[y - 1][x] == 0 or (x, y - 1) == self.goal):
+            if (x, y - 1) in self.stuck_positions and self.difficulty == "hard":
+                messagebox.showinfo("Game Over", "You hit a stuck square! Game over!")
+                self.end_game_with_stuck_squares()
+                return
+            elif (x, y - 1) in self.stuck_positions and self.difficulty == "easy":
+                self.warn_stuck_square(x, y - 1)
+                return
+            elif (x, y - 1) in self.stuck_positions and self.difficulty == "medium":
+                self.warn_stuck_square(x,y-1)
+                return  # Don't move if it's a stuck square on medium difficulty
+            else:
+                y -= 1
+                moved = True
+        elif event.keysym == "Right" and x < self.n - 1 and (self.grid[y][x + 1] == 0 or (x + 1, y) == self.goal):
+            if (x + 1, y) in self.stuck_positions and self.difficulty == "hard":
+                messagebox.showinfo("Game Over", "You hit a stuck square! Game over!")
+                self.end_game_with_stuck_squares()
+                return
+            elif (x + 1, y) in self.stuck_positions and self.difficulty == "easy":
+                self.warn_stuck_square(x + 1, y)
+                return
+            elif (x + 1, y) in self.stuck_positions and self.difficulty == "medium":
+                self.warn_stuck_square(x+1,y)
+                return
+            else:
+                x += 1
+                moved = True
+
+        if moved:
+            self.player = (x, y)
+            self.update_player_position()
+
+        if self.player == self.goal:
+            messagebox.showinfo("Game Over", "You reached the goal!")
+            self.end_game_with_stuck_squares()
+
+    def warn_stuck_square(self, x=None, y=None):
+        self.warning_sound.play()
+        if self.difficulty == "medium":
+            if self.medium_warning_counter > 0:
+                self.medium_warning_counter -= 1
+                messagebox.showwarning("Warning",
+                                       f"Approaching a stuck square! Chances left: {self.medium_warning_counter}")
+                if x is not None and y is not None:
+                    self.canvas.create_rectangle(
+                        x * self.cell_size, y * self.cell_size,
+                        (x + 1) * self.cell_size, (y + 1) * self.cell_size,
+                        fill="red"
+                    )
+                    self.canvas.create_text(
+                        (x + 0.5) * self.cell_size, (y + 0.5) * self.cell_size,
+                        text="🔥", font=("Arial", int(self.cell_size * 0.75)), tags="stuck_square"
+                    )
+                self.player = self.get_previous_position(x, y)
+            else:
+                messagebox.showinfo("Game Over", "You exceeded the chances to approach a stuck square!")
+                self.end_game_with_stuck_squares()
+        else:
+            messagebox.showwarning("Warning", "Approaching a stuck square!")
+            if x is not None and y is not None:
+                self.canvas.create_rectangle(
+                    x * self.cell_size, y * self.cell_size,
+                    (x + 1) * self.cell_size, (y + 1) * self.cell_size,
+                    fill="red"
+                )
+                self.canvas.create_text(
+                    (x + 0.5) * self.cell_size, (y + 0.5) * self.cell_size,
+                    text="🔥", font=("Arial", int(self.cell_size * 0.75)), tags="stuck_square"
+                )
+
+
+            self.player = self.get_previous_position(x, y)
+
+    def get_previous_position(self, x, y):
+        if len(self.path) > 1:
+            prev_x, prev_y = self.path[-2]
+            if prev_x == x and prev_y == y - 1:
+                return prev_x, prev_y
+        return self.player
+
+    def end_game_with_stuck_squares(self):
+        self.sucksquare_window_sound.play()
+        stuck_square_count = len(self.stuck_positions)
+        for x, y in self.stuck_positions:
+            self.canvas.create_rectangle(
+                x * self.cell_size, y * self.cell_size,
+                (x + 1) * self.cell_size, (y + 1) * self.cell_size,
+                fill="red"
+            )
+            self.canvas.create_text(
+                (x + 0.5) * self.cell_size, (y + 0.5) * self.cell_size,
+                text="🔥", font=("Arial", int(self.cell_size * 0.75)), tags="stuck_square"
+            )
+
+        count_window = tk.Toplevel(self.root)
+        count_window.title("Stuck Squares Count")
+        count_window.geometry("1600x1600")
+        bg_image = tk.PhotoImage(file="C:/Users/Lokula Alekhya/Desktop/pythonr/game over.png")
+
+
+        bg_label = tk.Label(count_window, image=bg_image)
+        bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+
+        count_label = tk.Label(count_window, text=f"Total Stuck Squares: {stuck_square_count}", font=("Arial", 25))
+        count_label.pack(pady=180)
+
+        play_again = tk.Button(count_window, text="Play Again", command=self.restart_game, font=("Arial", 20))
+        play_again.pack()
+        self.bg_image = bg_image
+
+    def restart_game(self):
+            self.root.destroy()
+            start_tkinter_game()
+
+current_video_index = 0
+while game_state == "start_menu":
+    draw_start_menu()
+    handle_start_menu_events()
+    pygame.display.update()
+
